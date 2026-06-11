@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>武汉市春季樱花景象空间分布专题地图</title>
+<link href="https://fonts.googleapis.cn/css2?family=Ma+Shan+Zheng&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #fef9fb;
+    --gold: #d4687c;
+    --gold-light: #fbc0cc;
+    --orange: #d87888;
+    --amber: #c05060;
+    --rust: #a0522d;
+    --cream: #fffafc;
+    --dark: #3e2723;
+    --panel-bg: rgba(255,250,252,0.94);
+    --title-gold: #b85a70;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'STSong', 'SimSun', 'Songti SC', 'Noto Serif SC', 'KaiTi', 'STKaiti', serif;
+    background: linear-gradient(170deg, #fef9fb 0%, #fef5f8 30%, #fdf0f4 60%, #fef7fa 100%);
+    min-height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ===== 飘落樱花花瓣 ===== */
+  .petals-container {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none; z-index: 9999;
+  }
+  .petal {
+    position: absolute;
+    width: 12px; height: 12px;
+    background: radial-gradient(circle at 30% 30%, #fcc0d0, #e898a8);
+    border-radius: 50% 0 50% 0;
+    opacity: 0;
+    animation: petalFall linear infinite;
+  }
+  @keyframes petalFall {
+    0%   { transform: translate(0, -10vh) rotate(0deg) scale(1); opacity: 0; }
+    10%  { opacity: 0.8; }
+    85%  { opacity: 0.5; }
+    100% { transform: translate(var(--drift), 105vh) rotate(720deg) scale(0.3); opacity: 0; }
+  }
+
+  /* ===== 顶部标题栏 ===== */
+  .header {
+    position: relative; z-index: 100;
+    background: linear-gradient(180deg, rgba(80,25,40,0.92) 0%, rgba(100,35,50,0.88) 100%);
+    padding: 14px 30px;
+    display: flex; align-items: center; justify-content: space-between;
+    box-shadow: 0 3px 24px rgba(150,50,70,0.35);
+    border-bottom: 3px solid #d4687c;
+  }
+  .header::after {
+    content: '';
+    position: absolute; bottom: -3px; left: 0; width: 100%; height: 1px;
+    background: linear-gradient(90deg, transparent, #fbc0cc, #d87888, #fbc0cc, transparent);
+  }
+  .header-left { display: flex; align-items: center; gap: 14px; }
+  .osmanthus-icon {
+    font-size: 32px;
+    filter: drop-shadow(0 0 8px rgba(240,140,160,0.5));
+    animation: glow 2s ease-in-out infinite;
+  }
+  @keyframes glow {
+    0%,100% { filter: drop-shadow(0 0 6px rgba(240,140,160,0.4)); }
+    50%     { filter: drop-shadow(0 0 14px rgba(240,140,160,0.8)); }
+  }
+  .header h1 {
+    font-family: 'Ma Shan Zheng', 'STXingkai', 'STKaiti', 'KaiTi', cursive;
+    font-size: 30px; font-weight: 400; color: #fbc0cc;
+    letter-spacing: 6px;
+    text-shadow: 0 0 24px rgba(240,140,160,0.45);
+  }
+  .header-right {
+    font-size: 13px; color: #d4a0ac;
+    text-align: right; line-height: 1.6;
+  }
+
+  /* ===== 主体布局 ===== */
+  .main-container {
+    display: flex; height: calc(100vh - 78px);
+    position: relative; z-index: 1;
+  }
+
+  /* ===== 地图区域 ===== */
+  .map-wrapper {
+    flex: 1; position: relative;
+    margin: 10px 8px 10px 12px;
+    border-radius: 14px; overflow: hidden;
+    box-shadow: 0 6px 32px rgba(150,50,70,0.25), 0 0 0 2px rgba(220,140,160,0.2);
+  }
+  #map {
+    width: 100%; height: 100%;
+  }
+  /* 暖秋色调滤镜层 */
+  .map-warm-overlay {
+    position: absolute; top: 0; left: 0;
+    width: 100%; height: 100%; pointer-events: none; z-index: 5;
+    background: linear-gradient(135deg,
+      rgba(255,160,180,0.07) 0%,
+      rgba(255,140,160,0.04) 25%,
+      rgba(240,120,150,0.07) 55%,
+      rgba(255,170,50,0.05) 80%,
+      rgba(255,150,170,0.08) 100%
+    );
+    mix-blend-mode: overlay;
+    border-radius: 14px;
+  }
+
+  /* 地图上的标题浮层 */
+  .map-title-overlay {
+    position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+    z-index: 10; pointer-events: none;
+    background: rgba(80,25,40,0.78);
+    color: #fbc0cc;
+    padding: 8px 28px; border-radius: 30px;
+    font-family: 'Ma Shan Zheng', 'STXingkai', 'STKaiti', 'KaiTi', cursive;
+    font-size: 20px; font-weight: 400; letter-spacing: 5px;
+    border: 1px solid rgba(230,130,160,0.5);
+    backdrop-filter: blur(6px);
+    white-space: nowrap;
+  }
+
+  /* 方法标注浮层 */
+  .method-badge {
+    position: absolute; z-index: 10; pointer-events: none;
+    background: rgba(255,250,252,0.9);
+    color: #8b3a50; font-size: 12px;
+    padding: 4px 12px; border-radius: 20px;
+    border: 1px solid #f0a0b8;
+    backdrop-filter: blur(4px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    font-weight: bold;
+  }
+  .method-badge.b1 { bottom: 140px; left: 20px; }
+  .method-badge.b2 { bottom: 100px; left: 20px; }
+  .method-badge.b3 { bottom: 60px;  left: 20px; }
+  .method-badge.b4 { bottom: 20px;  left: 20px; }
+
+  /* ===== 右侧面板 ===== */
+  .sidebar {
+    width: 380px; display: flex; flex-direction: column; gap: 10px;
+    padding: 10px 12px 10px 4px;
+    overflow-y: auto;
+  }
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-thumb { background: #d4a0b8; border-radius: 4px; }
+
+  .panel {
+    background: var(--panel-bg);
+    border-radius: 12px; padding: 16px 18px;
+    box-shadow: 0 2px 16px rgba(150,50,70,0.1);
+    border: 1px solid rgba(220,140,160,0.25);
+    backdrop-filter: blur(8px);
+  }
+  .panel h3 {
+    font-size: 15px; color: #8b3a50;
+    border-left: 4px solid #e898a8;
+    padding-left: 10px; margin-bottom: 12px;
+    letter-spacing: 2px;
+  }
+
+  /* 图例 */
+  .legend-item { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 12px; color: #5d2a3a; }
+  .legend-color {
+    width: 20px; height: 14px; border-radius: 3px;
+    flex-shrink: 0; border: 1px solid rgba(0,0,0,0.1);
+  }
+  .legend-marker {
+    width: 16px; height: 16px; border-radius: 50%;
+    flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .legend-marker.major { background: radial-gradient(circle at 35% 35%, #ff6b35, #c0392b); width: 20px; height: 20px; }
+  .legend-marker.medium { background: radial-gradient(circle at 35% 35%, #f5a623, #d4687c); }
+  .legend-marker.minor { background: radial-gradient(circle at 35% 35%, #fcc0d0, #e898a8); width: 12px; height: 12px; }
+  .legend-line { width: 22px; height: 2px; border-top: 2px dashed #d87888; flex-shrink: 0; }
+
+  /* 统计图表 */
+  #chart-canvas { width: 100%; height: 200px; display: block; }
+
+  /* 方法说明 */
+  .method-desc { font-size: 11px; color: #6b2a3a; line-height: 1.8; }
+  .method-desc .tag {
+    display: inline-block;
+    background: #fdf0f4; color: #b85a70;
+    padding: 2px 8px; border-radius: 12px;
+    margin: 2px 4px 2px 0;
+    font-weight: bold; font-size: 10px;
+  }
+  .method-desc .tag.active { background: #d87888; color: #fff; }
+
+  /* 底部信息 */
+  .footer-info {
+    font-size: 11px; color: #9b6070; text-align: center;
+    padding: 4px 0;
+  }
+
+  /* 响应式 */
+  @media (max-width: 900px) {
+    .main-container { flex-direction: column; }
+    .sidebar { width: 100%; flex-direction: row; flex-wrap: wrap; padding: 8px; }
+    .panel { flex: 1; min-width: 180px; }
+    .map-wrapper { height: 55vh; margin: 6px; }
+  }
+
+  /* 百度地图自定义信息窗口样式 */
+  .info-window {
+    padding: 6px 4px;
+    font-family: 'STSong','KaiTi',serif;
+  }
+  .info-window h4 {
+    color: #8b3a50; font-size: 14px; margin-bottom: 4px;
+    border-bottom: 1px dashed #f0a0b8; padding-bottom: 4px;
+  }
+  .info-window p { font-size: 11px; color: #5d2a3a; line-height: 1.6; }
+  .info-window .highlight { color: #d87888; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<!-- 飘落花瓣 -->
+<div class="petals-container" id="petals"></div>
+
+<!-- 顶部标题 -->
+<div class="header">
+  <div class="header-left">
+    <h1>武汉市春季樱花景象空间分布专题地图</h1>
+  </div>
+  <div class="header-right">
+    2026年 · 课程设计报告<br>
+    制图方法：分级统计图法 + 分区统计图表法 + 分级符号法 + 统计图表法 + 范围法
+  </div>
+</div>
+
+<!-- 主体 -->
+<div class="main-container">
+  <!-- 地图 -->
+  <div class="map-wrapper">
+    <div class="map-title-overlay">樱漫江城 · 武汉赏樱地图</div>
+    <div id="map"></div>
+    <div class="map-warm-overlay"></div>
+  </div>
+
+  <!-- 侧边栏 -->
+  <div class="sidebar">
+    <!-- 图例 -->
+    <div class="panel">
+      <h3>📐 图例 Legend</h3>
+      <div style="margin-bottom:8px;">
+        <div style="font-size:12px;color:#8b3a50;margin-bottom:4px;">▎分级统计图（各区樱花密度）</div>
+        <div class="legend-item"><span class="legend-color" style="background:#c05060;"></span> 高密度区（8+处）</div>
+        <div class="legend-item"><span class="legend-color" style="background:#d87888;"></span> 中高密度区（5-7处）</div>
+        <div class="legend-item"><span class="legend-color" style="background:#e8a0b0;"></span> 中等密度区（3-4处）</div>
+        <div class="legend-item"><span class="legend-color" style="background:#f5cad4;"></span> 低密度区（1-2处）</div>
+        <div class="legend-item"><span class="legend-color" style="background:#fce8ec;"></span> 暂无数据区</div>
+      </div>
+      <div style="margin-bottom:8px;">
+        <div style="font-size:12px;color:#8b3a50;margin-bottom:4px;">▎点值法（赏樱地点分级）</div>
+        <div class="legend-item"><canvas class="legend-flower" data-level="major" width="40" height="40"></canvas> 核心景区（万株级以上）</div>
+        <div class="legend-item"><canvas class="legend-flower" data-level="medium" width="32" height="32"></canvas> 主要赏樱点（千株级）</div>
+        <div class="legend-item"><canvas class="legend-flower" data-level="minor" width="24" height="24"></canvas> 一般赏樱点（百株级）</div>
+      </div>
+      <div style="margin-bottom:8px;">
+        <div style="font-size:12px;color:#8b3a50;margin-bottom:4px;">▎分区统计图表法（各区饼图）</div>
+        <div class="legend-item"><span class="legend-color" style="background:#d4687c;"></span> 万株级占比</div>
+        <div class="legend-item"><span class="legend-color" style="background:#f0a0b8;"></span> 千株级占比</div>
+        <div class="legend-item"><span class="legend-color" style="background:#fcd0dc;"></span> 百株级占比</div>
+      </div>
+      <div>
+        <div style="font-size:12px;color:#8b3a50;margin-bottom:4px;">▎范围法（樱花影响力圈）</div>
+        <div class="legend-item"><span class="legend-line"></span> 核心辐射范围（5km圈）</div>
+      </div>
+    </div>
+
+    <!-- 统计图表 -->
+    <div class="panel">
+      <h3>📊 各区樱花景点数量统计</h3>
+      <canvas id="chart-canvas"></canvas>
+    </div>
+
+    <!-- 方法说明 -->
+    <div class="panel">
+      <h3>🔬 专题地图制图方法说明</h3>
+      <div class="method-desc">
+        <span class="tag active">①分级统计图法</span> 按行政区划统计樱花景点密度，用不同深浅橙色系填充各区。<br><br>
+        <span class="tag active">②分区统计图表法</span> 在各区中心放置饼图，展示万株/千株/百株三级占比结构。<br><br>
+        <span class="tag active">③分级符号法（点值法）</span> 以不同大小的樱花象形符号标注各赏樱地点级别与规模。<br><br>
+        <span class="tag active">④统计图表法</span> 右侧面板柱状图展示各区数量统计，辅助图面信息。<br><br>
+        <span class="tag active">⑤范围法</span> 以核心景区为中心绘制 5km 辐射影响力圈。
+      </div>
+    </div>
+
+    <!-- 数据来源 -->
+    <div class="footer-info">
+      数据来源：武汉市文旅局、各景区公开资料 · 底图：百度地图 · 制图时间：2026.06
+    </div>
+  </div>
+</div>
+
+<!-- 百度地图GL API -->
+<script src="https://api.map.baidu.com/api?type=webgl&v=1.0&ak=szmJ5Oc3byDHwzN2BEyJbORdKlKXcGdk"></script>
+
+<script>
+// ============================================================
+// 数据定义 - 武汉市樱花景点完整数据
+// ============================================================
+
+// 各区樱花景点数量（用于分级统计图）
+const districtData = {
+  '武昌区': { count: 34, level: 'very-high', color: '#c05060' },
+  '洪山区': { count: 32, level: 'very-high', color: '#c05060' },
+  '江汉区': { count: 7, level: 'high', color: '#d87888' },
+  '东西湖区': { count: 6, level: 'high', color: '#d87888' },
+  '蔡甸区': { count: 6, level: 'high', color: '#d87888' },
+  '江岸区': { count: 4, level: 'medium', color: '#e8a0b0' },
+  '青山区': { count: 3, level: 'medium', color: '#e8a0b0' },
+  '黄陂区': { count: 3, level: 'medium', color: '#e8a0b0' },
+  '江夏区': { count: 3, level: 'medium', color: '#e8a0b0' },
+  '汉南区': { count: 2, level: 'low', color: '#f5cad4' },
+  '新洲区': { count: 2, level: 'low', color: '#f5cad4' },
+  '硚口区': { count: 2, level: 'low', color: '#f5cad4' },
+  '汉阳区': { count: 1, level: 'low', color: '#f5cad4' }
+};
+
+// 所有赏樱地点数据
+const osmanthusSpots = [
+  { name:'东湖樱园', lng:114.416804, lat:30.552018, level:'major', scale:'大规模', desc:'武汉市武昌区鲁磨路665号', district:'武昌区' },
+  { name:'武汉大学-樱花城堡', lng:114.369659, lat:30.546378, level:'medium', scale:'中等规模', desc:'湖北省武汉市武昌区樱花大道附近(武汉大学内)', district:'武昌区' },
+  { name:'樱花园', lng:114.495188, lat:30.519972, level:'major', scale:'大规模', desc:'武汉市洪山区石门峰纪念公园福光园A区', district:'洪山区' },
+  { name:'中央明渠樱花溪公园', lng:114.136802, lat:30.654529, level:'medium', scale:'中等规模', desc:'湖北省武汉市东西湖区径西六路与智雅路交叉口北200米', district:'东西湖区' },
+  { name:'樱花林', lng:114.081855, lat:30.491964, level:'medium', scale:'中等规模', desc:'天星村1号武汉花博汇内', district:'洪山区' },
+  { name:'樱花花海', lng:114.276061, lat:30.670252, level:'medium', scale:'中等规模', desc:'湖北省武汉市东西湖区金银潭大道碧桂园海昌天澜白鹭湾北100米黄塘湖公园', district:'东西湖区' },
+  { name:'樱花园', lng:114.280058, lat:30.550166, level:'major', scale:'大规模', desc:'武汉市汉阳区拦江路193号附2号', district:'汉阳区' },
+  { name:'武汉大学樱园', lng:114.369037, lat:30.545372, level:'major', scale:'大规模', desc:'湖北省武汉市武昌区八一路武汉大学内', district:'武昌区' },
+  { name:'樱花大道', lng:114.371419, lat:30.545926, level:'medium', scale:'中等规模', desc:'湖北省武汉市武昌区', district:'武昌区' },
+  { name:'樱花园', lng:114.415956, lat:30.643513, level:'major', scale:'大规模', desc:'和平大道1546号青山公园', district:'青山区' },
+  { name:'樱花村', lng:114.081821, lat:30.492496, level:'medium', scale:'中等规模', desc:'天星村1号武汉花博汇内', district:'洪山区' },
+  { name:'武汉文驳生态樱花园', lng:114.03725, lat:30.406802, level:'major', scale:'大规模', desc:'武汉市蔡甸区陈家村特1号', district:'蔡甸区' },
+  { name:'樱花大道', lng:114.254079, lat:30.608726, level:'medium', scale:'中等规模', desc:'湖北省武汉市江汉区', district:'江汉区' },
+  { name:'山东银杏樱花', lng:114.367028, lat:30.720548, level:'medium', scale:'中等规模', desc:'武汉市黄陂区苗木三路与尚武道交叉路口往东北约100米', district:'黄陂区' },
+  { name:'青春村樱花园', lng:114.261087, lat:30.188952, level:'major', scale:'大规模', desc:'湖北省武汉市江夏区青春村', district:'江夏区' },
+  { name:'欢乐丛林樱花主题乐园', lng:114.412769, lat:30.553129, level:'medium', scale:'中等规模', desc:'武汉市武昌区鲁磨路665号东湖风景区', district:'武昌区' },
+  { name:'樱花园', lng:114.032769, lat:30.607415, level:'major', scale:'大规模', desc:'武汉市东西湖区慈惠农村鸦渡大队石榴红村内', district:'东西湖区' },
+  { name:'樱花市集', lng:114.413584, lat:30.553442, level:'medium', scale:'中等规模', desc:'武汉市武昌区东湖隧道东湖生态旅游风景区', district:'武昌区' },
+  { name:'武汉东湖樱花园-售票处', lng:114.415381, lat:30.550175, level:'major', scale:'大规模', desc:'武汉市武昌区沿湖大道58号磨山景区东湖樱花园内', district:'武昌区' },
+  { name:'武大航域二区-樱花墅', lng:114.417365, lat:30.460971, level:'medium', scale:'中等规模', desc:'武汉市江夏区武大园东路与武大园二路交叉路口往东北约100米武大航域二区', district:'江夏区' },
+  { name:'东湖景区磨山景区观光车樱花园', lng:114.417814, lat:30.554265, level:'major', scale:'大规模', desc:'湖北省武汉市武昌区东湖风景区鲁磨路665号', district:'武昌区' },
+  { name:'解放公园-樱花坡', lng:114.309054, lat:30.615158, level:'medium', scale:'中等规模', desc:'湖北省武汉市江岸区解放大道1861号解放公园内(东侧)', district:'江岸区' },
+  { name:'樱园大草坪', lng:114.417656, lat:30.550595, level:'major', scale:'大规模', desc:'武汉市武昌区鲁磨路665号武汉东湖樱花园', district:'武昌区' },
+  { name:'落樱缤纷(樱花园)', lng:114.415829, lat:30.643571, level:'major', scale:'大规模', desc:'和平大道1544号青山公园', district:'青山区' },
+  { name:'樱花集市亭', lng:114.418394, lat:30.553701, level:'medium', scale:'中等规模', desc:'武汉市武昌区鲁磨路665号武汉东湖樱花园', district:'武昌区' },
+  { name:'东湖樱园-大门', lng:114.415623, lat:30.549924, level:'major', scale:'大规模', desc:'武汉市武昌区鲁磨路东湖风景区内', district:'武昌区' },
+  { name:'樱花数码影像', lng:114.306656, lat:30.595157, level:'medium', scale:'中等规模', desc:'胜利街217号樱花数码', district:'洪山区' },
+  { name:'武汉樱花住宿', lng:114.330593, lat:30.480178, level:'medium', scale:'中等规模', desc:'野芷湖西路马湖新村7栋6号', district:'洪山区' },
+  { name:'武汉猫小姐的樱花旅舍', lng:114.321428, lat:30.563988, level:'medium', scale:'中等规模', desc:'积玉桥尚隆路尚隆地球村2栋1单元402室', district:'洪山区' },
+  { name:'丹麦花园', lng:114.417804, lat:30.552747, level:'minor', scale:'小规模', desc:'武汉市武昌区沿湖大道58号磨山景区内', district:'武昌区' },
+  { name:'花城家园-樱园', lng:114.539188, lat:30.524029, level:'major', scale:'大规模', desc:'湖北省武汉市洪山区森林大道花城家园兰园社区内', district:'洪山区' },
+  { name:'老柏泉味道(樱花溪店)', lng:114.137715, lat:30.64601, level:'medium', scale:'中等规模', desc:'径西六路与凌云路交叉口西北角商铺', district:'洪山区' },
+  { name:'武汉花乡茶谷旅游景区-樱园', lng:114.507269, lat:31.018435, level:'major', scale:'大规模', desc:'武汉市黄陂区蔡家榨街彭家湾村红岗山花乡茶谷旅游风景区', district:'黄陂区' },
+  { name:'武汉大学梅园操场', lng:114.371157, lat:30.544882, level:'medium', scale:'中等规模', desc:'湖北省武汉市武昌区武汉大学(近樱花大道)', district:'武昌区' },
+  { name:'丽岛花园樱园', lng:114.352755, lat:30.508394, level:'major', scale:'大规模', desc:'武汉市洪山区珞狮路丽岛花园', district:'洪山区' },
+  { name:'东湖樱园-五重塔', lng:114.417854, lat:30.54947, level:'major', scale:'大规模', desc:'武汉市武昌区沿湖大道58号磨山景区东湖樱花园内', district:'武昌区' },
+  { name:'郧阳村红樱采摘园', lng:113.932581, lat:30.348972, level:'medium', scale:'中等规模', desc:'湖北省武汉市汉南区东荆街道X028(东荆街)', district:'汉南区' },
+  { name:'樱园', lng:114.313673, lat:30.599769, level:'major', scale:'大规模', desc:'武汉市江岸区沿江大道江滩78号王家巷派出所附近', district:'江岸区' },
+  { name:'武汉湿地樱花园', lng:114.612797, lat:30.827458, level:'major', scale:'大规模', desc:'湖北省武汉市新洲区武滨路100号', district:'新洲区' },
+  { name:'洪山江滩滑板公园', lng:114.271118, lat:30.499726, level:'medium', scale:'中等规模', desc:'湖北省武汉市洪山区武金堤路三桥社区西北侧约210米', district:'洪山区' },
+  { name:'磨山樱花', lng:114.416501, lat:30.546637, level:'medium', scale:'中等规模', desc:'武汉市武昌区东湖隧道东湖梅园', district:'武昌区' },
+  { name:'樱花乐园', lng:114.280546, lat:30.47457, level:'medium', scale:'中等规模', desc:'湖北省武汉市洪山区张家湾街道胜利公园', district:'洪山区' },
+  { name:'平湖珞樱', lng:114.380156, lat:30.547985, level:'medium', scale:'中等规模', desc:'湖北省武汉市武昌区东湖生态旅游风景区内东湖绿道东湖书香道', district:'武昌区' },
+  { name:'樱瀑亭', lng:114.415849, lat:30.553167, level:'medium', scale:'中等规模', desc:'武汉市武昌区鲁磨路665号武汉东湖樱花园', district:'武昌区' },
+  { name:'樱缘铁板烧(东湖之眼店)', lng:114.41218, lat:30.554233, level:'medium', scale:'中等规模', desc:'东湖隧道东湖磨山旅游风景区欢乐丛林东湖之眼一楼', district:'洪山区' },
+  { name:'热带雨林主题乐园(万豪世纪天街店)', lng:114.332409, lat:30.372455, level:'minor', scale:'小规模', desc:'谭鑫培路万豪世纪天街三楼（谭鑫培公园对面华夏影城旁）', district:'洪山区' },
+  { name:'百鸟齐飞观赏点', lng:114.439142, lat:30.571165, level:'minor', scale:'小规模', desc:'武汉市洪山区郊野道武汉东湖懒院别墅东南侧约240米落雁生境半岛', district:'洪山区' },
+  { name:'武汉樱花之恋', lng:114.60494, lat:30.820489, level:'medium', scale:'中等规模', desc:'湖北省武汉市新洲区仓埠山庄生态钓场东南侧', district:'新洲区' },
+  { name:'武汉野生动物王国-大红鹳', lng:113.948872, lat:30.55595, level:'minor', scale:'小规模', desc:'乌梅山特1号武汉野生动物王国', district:'洪山区' },
+  { name:'东亭花园-樱花苑', lng:114.370453, lat:30.57527, level:'medium', scale:'中等规模', desc:'湖北省武汉市武昌区东亭路10号', district:'武昌区' },
+  { name:'东风阳光城-樱花苑', lng:114.156639, lat:30.501679, level:'medium', scale:'中等规模', desc:'武汉市蔡甸区车城西路68号', district:'蔡甸区' },
+  { name:'青山公园-樱花苑', lng:114.416334, lat:30.643509, level:'medium', scale:'中等规模', desc:'和平大道1544号青山公园', district:'青山区' },
+  { name:'东风阳光城3期-东区樱花苑7栋', lng:114.157178, lat:30.500432, level:'medium', scale:'中等规模', desc:'湖北省武汉市蔡甸区沌口东风·阳光城三期(沌阳大道北)', district:'蔡甸区' },
+  { name:'东亭花园樱花苑-20栋', lng:114.370097, lat:30.57512, level:'medium', scale:'中等规模', desc:'湖北省武汉市武昌区东亭路10号', district:'武昌区' },
+  { name:'东风阳光城3期-樱花苑2栋', lng:114.157602, lat:30.500651, level:'medium', scale:'中等规模', desc:'湖北省武汉市蔡甸区车城西路70号', district:'蔡甸区' },
+  { name:'中山公园樱花广场', lng:114.280564, lat:30.595672, level:'medium', scale:'中等规模', desc:'湖北省武汉市江汉区解放大道1265号中山公园东门', district:'江汉区' },
+  { name:'东湖之森洛嘉森乐园', lng:114.414934, lat:30.551817, level:'minor', scale:'小规模', desc:'武汉市洪山区鲁磨路磨山景区', district:'洪山区' },
+  { name:'樱花大道/科技路(路口)', lng:114.368826, lat:30.543982, level:'medium', scale:'中等规模', desc:'武汉市武昌区自强大道', district:'武昌区' },
+  { name:'文体路与樱花大道交叉口', lng:114.368826, lat:30.543982, level:'medium', scale:'中等规模', desc:'武汉市武昌区自强大道', district:'武昌区' },
+  { name:'樱花轮胎(沌口路店)', lng:NaN, lat:114.230239, level:'minor', scale:'小规模', desc:'"沌口路', district:'洪山区' },
+  { name:'樱花大道与自强大道交叉口', lng:114.368826, lat:30.543982, level:'medium', scale:'中等规模', desc:'武汉市武昌区樱花大道', district:'武昌区' },
+  { name:'樱花径', lng:114.307986, lat:30.588697, level:'medium', scale:'中等规模', desc:'武汉市江岸区蔡锷路和沿江大道交叉口对面汉口江滩内', district:'江岸区' },
+  { name:'东湖樱园-西门', lng:114.414116, lat:30.55355, level:'major', scale:'大规模', desc:'武汉市武昌区沿湖大道58号磨山景区内', district:'武昌区' },
+  { name:'聚医整形', lng:114.36199, lat:30.540092, level:'minor', scale:'小规模', desc:'湖北省武汉市洪山区珞狮北路2号樱花大厦b座', district:'洪山区' },
+  { name:'公厕', lng:114.41249, lat:30.553823, level:'minor', scale:'小规模', desc:'武汉市武昌区沿湖大道58号磨山景区内', district:'武昌区' },
+  { name:'经心书院', lng:114.417469, lat:30.552235, level:'minor', scale:'小规模', desc:'沿湖大道58号磨山景区东湖樱花园内', district:'洪山区' },
+  { name:'樱园北路', lng:114.372887, lat:30.546863, level:'major', scale:'大规模', desc:'湖北省武汉市武昌区', district:'武昌区' },
+  { name:'泛海国际居住区樱海园', lng:114.258286, lat:30.610008, level:'medium', scale:'中等规模', desc:'湖北省武汉市江汉区云霞路199号', district:'江汉区' },
+  { name:'花城家园樱园-西门', lng:114.536989, lat:30.524558, level:'major', scale:'大规模', desc:'武汉市洪山区花城家园樱园', district:'洪山区' },
+  { name:'花城家园樱园-8栋', lng:114.538107, lat:30.524176, level:'major', scale:'大规模', desc:'武汉市洪山区花城家园樱园8栋', district:'洪山区' },
+  { name:'国家电网充电站(花城家园樱园)', lng:114.537918, lat:30.524438, level:'major', scale:'大规模', desc:'武汉市洪山区森林大道花城家园樱园西门东侧约90米', district:'洪山区' },
+  { name:'洵樱花涧', lng:114.415823, lat:30.553144, level:'medium', scale:'中等规模', desc:'武汉市武昌区东湖隧道东湖生态旅游风景区', district:'武昌区' },
+  { name:'曲院樱艳', lng:114.415985, lat:30.549498, level:'medium', scale:'中等规模', desc:'武汉市武昌区鲁磨路665号武汉东湖樱花园', district:'武昌区' },
+  { name:'武汉东湖樱花园-休息区', lng:114.4161, lat:30.551155, level:'major', scale:'大规模', desc:'武汉市武昌区鲁磨路665号武汉东湖樱花园', district:'武昌区' },
+  { name:'武汉东湖樱花园-休息区', lng:114.418637, lat:30.551936, level:'major', scale:'大规模', desc:'武汉市武昌区鲁磨路665号武汉东湖樱花园', district:'武昌区' },
+  { name:'武汉樱缘酒店(武汉大学店)', lng:114.374469, lat:30.535363, level:'medium', scale:'中等规模', desc:'珞南街道八一路340号东湖楚天府8栋2505号(近武汉大学正门、东湖)', district:'洪山区' },
+  { name:'蔡甸区都市农夫樱桃采摘园', lng:113.856891, lat:30.388536, level:'medium', scale:'中等规模', desc:'湖北省武汉市蔡甸区洪林路1号附6号', district:'蔡甸区' },
+  { name:'清真·马小英鲜牛肉砂锅(武昌泛悦汇KA街店)', lng:114.310993, lat:30.541085, level:'minor', scale:'小规模', desc:'湖北省武汉市武昌区首义路泛悦汇负一楼武昌号游轮旁', district:'武昌区' },
+  { name:'八一花园-金樱苑', lng:114.393977, lat:30.499176, level:'medium', scale:'中等规模', desc:'湖北省武汉市洪山区八一花园金樱苑(荣院路西50米)', district:'洪山区' },
+  { name:'桑椹樱桃蓝莓蟠桃采摘园', lng:114.042119, lat:30.603084, level:'medium', scale:'中等规模', desc:'湖北省武汉市东西湖区慈惠街道知青路19号', district:'东西湖区' },
+  { name:'红樱桃毛线店(长堤街店)', lng:114.267658, lat:30.574306, level:'medium', scale:'中等规模', desc:'湖北省武汉市硚口区长堤街268号', district:'硚口区' },
+  { name:'红樱桃(银松路店)', lng:114.274274, lat:30.596096, level:'medium', scale:'中等规模', desc:'湖北省武汉市江汉区万松园路144号附10号', district:'江汉区' },
+  { name:'落樱威(武汉越秀IFC国金天地店)', lng:114.28403, lat:30.591216, level:'medium', scale:'中等规模', desc:'湖北省武汉市江汉区精武路1号越秀国际金融汇内(近新华路与精武横路交叉口)武汉越秀IFC国金天地F1', district:'江汉区' },
+  { name:'倍阅·樱园店', lng:114.456592, lat:30.486854, level:'major', scale:'大规模', desc:'高新二路129号湖北第二师范学院图书馆区当代·国际花园', district:'洪山区' },
+  { name:'樱花·二次元桌游体验店(金银岛花园店)', lng:114.354169, lat:30.597728, level:'medium', scale:'中等规模', desc:'湖北省武汉市洪山区友谊大道508号时尚欧洲9号楼B座1单元901室', district:'洪山区' },
+  { name:'樱桃小宝小吃服务店', lng:114.295481, lat:30.473907, level:'medium', scale:'中等规模', desc:'湖北省武汉市洪山区张家湾街道东原启城二期商业S1-109号', district:'洪山区' },
+  { name:'樱悦·Massage·养生SPA(汉口年华店)', lng:114.318715, lat:30.656297, level:'medium', scale:'中等规模', desc:'武汉市江岸区后湖温馨路109汉口年华7栋', district:'江岸区' },
+  { name:'当当小书童托管晚辅', lng:114.329546, lat:30.423541, level:'minor', scale:'小规模', desc:'武汉市江夏区湖景南路福志友缘东北侧约60米', district:'江夏区' },
+  { name:'樱舞花园侏儒兔咖自拍馆下午茶', lng:114.30455, lat:30.594882, level:'medium', scale:'中等规模', desc:'一元里街道黎黄陂路黄陂一里13号', district:'黄陂区' },
+  { name:'落樱成猫咖·下午茶·简餐(国金天地店)', lng:114.283849, lat:30.591364, level:'medium', scale:'中等规模', desc:'新华街街道精武路1号(新华路体育馆对面)', district:'洪山区' },
+  { name:'不晚·BUWAN美甲美睫', lng:114.149973, lat:30.629324, level:'minor', scale:'小规模', desc:'湖北省武汉市东西湖区海林广场一号门对面周六福旁边二楼', district:'东西湖区' },
+  { name:'汉·樱沉浸式剧场', lng:114.355864, lat:30.534558, level:'medium', scale:'中等规模', desc:'洪山区-武珞路兆富国际大厦一栋30层3005号', district:'洪山区' },
+  { name:'传成老树白茶(泛海国际樱海园店)', lng:114.259644, lat:30.609633, level:'medium', scale:'中等规模', desc:'万松街道泛海国际云霞路樱海园一号门旁边', district:'洪山区' },
+  { name:'汉南红樱采摘园', lng:113.931455, lat:30.351053, level:'medium', scale:'中等规模', desc:'湖北省武汉市汉南区东荆街道X028(东荆街)', district:'汉南区' },
+  { name:'雨樱养生馆(思联花园城店)', lng:114.254054, lat:30.621561, level:'medium', scale:'中等规模', desc:'武汉市江汉区银墩路思联·花园城', district:'江汉区' },
+  { name:'樱酒吧(湘隆时代广场店)', lng:114.174945, lat:30.503881, level:'medium', scale:'中等规模', desc:'湖北省武汉市蔡甸区沌口街道宁康路58号', district:'蔡甸区' },
+  { name:'蚝运年年烧烤(复兴村烟火巷店)', lng:114.258771, lat:30.610565, level:'minor', scale:'小规模', desc:'武汉市江汉区云霞路泛海国际居住区樱海园', district:'江汉区' },
+  { name:'樱桃喜孕不孕不育VIP专病门诊', lng:114.310964, lat:30.541594, level:'medium', scale:'中等规模', desc:'武汉市武昌区张之洞路151号泛悦汇F3', district:'武昌区' },
+  { name:'刘婉婉生炸妙龄鸡餐饮店', lng:114.172678, lat:30.666399, level:'minor', scale:'小规模', desc:'湖北省武汉市东西湖区金银湖街道环路中路东、柏环二路北怡清雅筑商业A地块影城及商业影城1号楼(幢)/单元1层10号', district:'东西湖区' },
+  { name:'湖北樱慕娱乐有限公司', lng:114.322431, lat:30.557254, level:'medium', scale:'中等规模', desc:'湖北省武汉市武昌区粮道街道昙华林路202号泛悦汇·昙华林A-3栋A-F3-005/006、A-F3-007/008单元', district:'武昌区' },
+  { name:'武汉红樱影视传媒有限公司', lng:114.431324, lat:30.469793, level:'medium', scale:'中等规模', desc:'武汉市东湖新技术开发区光谷大道3号激光工程设计总部二期研发楼06幢06单元15层5号(Z0581)', district:'洪山区' },
+  { name:'樱雪(泛悦·南国广场店)', lng:114.229454, lat:30.589913, level:'medium', scale:'中等规模', desc:'湖北省武汉市硚口区解放大道387号泛悦·南国广场F2', district:'硚口区' },
+  { name:'武汉樱桃好育中医门诊部', lng:114.311014, lat:30.541318, level:'medium', scale:'中等规模', desc:'武汉市武昌区体育街泛悦汇', district:'武昌区' },
+  { name:'楚小樱的弹球屋', lng:114.412581, lat:30.553925, level:'medium', scale:'中等规模', desc:'武汉市武昌区东湖风景区鲁磨路665号东湖磨山欢乐丛林游乐园', district:'武昌区' },
+  { name:'恋樱私人影院', lng:114.360345, lat:30.530827, level:'medium', scale:'中等规模', desc:'珞狮南路147号未来城E座2403室', district:'洪山区' }
+];
+
+// ============================================================
+// 花瓣飘落动画
+// ============================================================
+(function createPetals() {
+  const container = document.getElementById('petals');
+  for (let i = 0; i < 35; i++) {
+    const petal = document.createElement('div');
+    petal.className = 'petal';
+    petal.style.left = Math.random() * 100 + '%';
+    petal.style.animationDuration = (6 + Math.random() * 10) + 's';
+    petal.style.animationDelay = Math.random() * 8 + 's';
+    petal.style.setProperty('--drift', (Math.random() - 0.5) * 200 + 'px');
+    petal.style.width = (8 + Math.random() * 10) + 'px';
+    petal.style.height = (8 + Math.random() * 10) + 'px';
+    container.appendChild(petal);
+  }
+})();
+
+// ============================================================
+// 百度地图初始化
+// ============================================================
+const map = new BMapGL.Map('map', {
+  center: new BMapGL.Point(114.42, 30.58),
+  zoom: 11,
+  enableRotate: false,
+  enableTilt: false,
+  minZoom: 9,
+  maxZoom: 17
+});
+
+// 启用鼠标滚轮缩放
+map.enableScrollWheelZoom(true);
+
+// 自定义暖秋风格底图
+map.setMapStyleV2({ styleId: '4a2f6f1e8d3c0b7a9e5f1c2d3b4a5967' });
+
+// 添加比例尺和缩放控件
+const scaleCtrl = new BMapGL.ScaleControl({ anchor: BMAP_ANCHOR_BOTTOM_RIGHT, offset: new BMapGL.Size(20, 30) });
+map.addControl(scaleCtrl);
+const zoomCtrl = new BMapGL.ZoomControl({ anchor: BMAP_ANCHOR_BOTTOM_RIGHT, offset: new BMapGL.Size(20, 90) });
+map.addControl(zoomCtrl);
+
+// 武汉市边界线（醒目边界 - 延迟加载避免和区划冲突）
+setTimeout(function drawCityBoundary() {
+  var bd = new BMapGL.Boundary();
+  bd.get('武汉市', function(rs) {
+    if (rs && rs.boundaries && rs.boundaries.length > 0) {
+      rs.boundaries.forEach(function(boundary) {
+        var pts = boundary.split(';').map(function(p) {
+          var parts = p.split(',');
+          return new BMapGL.Point(parseFloat(parts[0]), parseFloat(parts[1]));
+        });
+        // 外层粗金色边界
+        var outer = new BMapGL.Polygon(pts, {
+          strokeColor: '#d4687c',
+          strokeWeight: 4,
+          strokeOpacity: 0.7,
+          fillColor: 'transparent',
+          fillOpacity: 0
+        });
+        map.addOverlay(outer);
+        // 内层亮色高亮
+        var inner = new BMapGL.Polygon(pts, {
+          strokeColor: '#fbc0cc',
+          strokeWeight: 2,
+          strokeOpacity: 0.9,
+          fillColor: 'transparent',
+          fillOpacity: 0
+        });
+        map.addOverlay(inner);
+      });
+      console.log('✅ 武汉市边界线加载完成');
+    } else {
+      console.log('⚠️ 武汉市边界加载失败，重试中...');
+      // 重试一次
+      setTimeout(function() {
+        var bd2 = new BMapGL.Boundary();
+        bd2.get('湖北省武汉市', function(rs2) {
+          if (rs2 && rs2.boundaries) {
+            rs2.boundaries.forEach(function(b) {
+              var pts = b.split(';').map(function(p) {
+                var parts = p.split(',');
+                return new BMapGL.Point(parseFloat(parts[0]), parseFloat(parts[1]));
+              });
+              map.addOverlay(new BMapGL.Polygon(pts, {
+                strokeColor: '#d4687c', strokeWeight: 4, strokeOpacity: 0.7,
+                fillColor: 'transparent', fillOpacity: 0
+              }));
+            });
+            console.log('✅ 武汉市边界（重试）加载完成');
+          }
+        });
+      }, 2000);
+    }
+  });
+}, 6000);
+
+// ============================================================
+// 分级统计图法 - 各区行政区划着色 (Choropleth)
+// ============================================================
+function loadDistrictBoundary(districtName, color, opacity) {
+  return new Promise(function(resolve, reject) {
+    // 尝试多个名称格式
+    var names = ['武汉市' + districtName, '湖北省武汉市' + districtName, districtName];
+    var tried = 0;
+    function tryNext() {
+      if (tried >= names.length) { reject(new Error('所有名称均失败')); return; }
+      var name = names[tried++];
+      var bd = new BMapGL.Boundary();
+      bd.get(name, function(rs) {
+        if (rs && rs.boundaries && rs.boundaries.length > 0) {
+          rs.boundaries.forEach(function(boundary) {
+            var pts = boundary.split(';').map(function(p) {
+              var parts = p.split(',');
+              return new BMapGL.Point(parseFloat(parts[0]), parseFloat(parts[1]));
+            });
+            map.addOverlay(new BMapGL.Polygon(pts, {
+              strokeColor: '#d4687c', strokeWeight: 1.2, strokeOpacity: 0.5,
+              fillColor: color, fillOpacity: opacity
+            }));
+          });
+          resolve();
+        } else {
+          tryNext();
+        }
+      });
+    }
+    tryNext();
+  });
+}
+
+// 逐个加载区划边界（避免限流）
+async function renderChoropleth() {
+  const entries = Object.entries(districtData).filter(function(d) { return d[0] !== '汉南区'; });
+  for (var i = 0; i < entries.length; i++) {
+    var district = entries[i][0];
+    var data = entries[i][1];
+    var opacity = data.level === 'very-high' ? 0.45 :
+                  data.level === 'high' ? 0.38 :
+                  data.level === 'medium' ? 0.30 : 0.20;
+    try {
+      await loadDistrictBoundary(district, data.color, opacity);
+      console.log('  ✅ ' + district + ' 边界加载成功');
+    } catch(e) {
+      console.log('  ⚠️ ' + district + ' 加载失败: ' + e.message);
+    }
+    // 每个之间间隔300ms防止限流
+    await new Promise(function(r) { setTimeout(r, 300); });
+  }
+  console.log('✅ 分级统计图层加载完成');
+}
+
+// ============================================================
+// 点值法/分级符号法 - 赏樱地点标记
+// ============================================================
+function createMarkerIcon(level) {
+  var cfg={major:{size:44,clusters:5,petal:'#f07088',center:'#d04060'},medium:{size:32,clusters:3,petal:'#f598a8',center:'#e06078'},minor:{size:22,clusters:1,petal:'#fcc0d0',center:'#f08898'}}[level];
+  var S=cfg.size,DPR=2,c=document.createElement('canvas');c.width=S*DPR;c.height=S*DPR;
+  var t=c.getContext('2d');t.scale(DPR,DPR);t.clearRect(0,0,S,S);var cx=S/2,cy=S/2;
+  function draw(x,y,r){for(var i=0;i<5;i++){var a=-Math.PI/2+i*Math.PI*2/5;var px=x+Math.cos(a)*r*0.38,py=y+Math.sin(a)*r*0.38;t.fillStyle=cfg.petal;t.beginPath();t.ellipse(px,py,r*0.3,r*0.45,a,0,Math.PI*2);t.fill();t.fillStyle='rgba(255,255,255,0.4)';t.beginPath();t.ellipse(px+Math.cos(a)*r*0.08,py+Math.sin(a)*r*0.08,r*0.1,r*0.18,a,0,Math.PI*2);t.fill()}var g=t.createRadialGradient(x,y,0,x,y,r*0.25);g.addColorStop(0,'#fffefc');g.addColorStop(0.4,cfg.petal);g.addColorStop(1,cfg.center);t.fillStyle=g;t.beginPath();t.arc(x,y,r*0.25,0,Math.PI*2);t.fill();t.fillStyle=cfg.center;for(var i=0;i<5;i++){var a=i*Math.PI*2/5;t.beginPath();t.arc(x+Math.cos(a)*r*0.1,y+Math.sin(a)*r*0.1,r*0.05,0,Math.PI*2);t.fill()}}
+  if(cfg.clusters===1){draw(cx,cy,S*0.38)}else{var sp=S*0.22;var pos=cfg.clusters===5?[[0,-sp],[sp*0.85,-sp*0.3],[sp*0.55,sp*0.7],[-sp*0.55,sp*0.7],[-sp*0.85,-sp*0.3]]:[[0,-sp*0.7],[sp*0.65,sp*0.45],[-sp*0.65,sp*0.45]];pos.forEach(function(p){draw(cx+p[0],cy+p[1],S*0.2)})}
+  return new BMapGL.Icon(c.toDataURL(),new BMapGL.Size(S*DPR,S*DPR),{anchor:new BMapGL.Size(S*DPR/2,S*DPR/2),imageSize:new BMapGL.Size(S*DPR,S*DPR)});
+}
+
+// 创建标记
+const markers = {};
+osmanthusSpots.forEach(function(spot) {
+  const point = new BMapGL.Point(spot.lng, spot.lat);
+  const icon = createMarkerIcon(spot.level);
+  const marker = new BMapGL.Marker(point, { icon: icon });
+  map.addOverlay(marker);
+
+  // 信息窗口
+  const infoContent = `
+    <div class="info-window">
+      <h4>🌼 ${spot.name}</h4>
+      <p><span class="highlight">规模：</span>${spot.scale}</p>
+      <p><span class="highlight">所属区域：</span>${spot.district}</p>
+      <p>${spot.desc}</p>
+    </div>
+  `;
+  const infoWindow = new BMapGL.InfoWindow(infoContent, {
+    width: 240,
+    title: '',
+    enableAutoPan: true
+  });
+
+  marker.addEventListener('click', function() {
+    // 关闭所有已打开的信息窗口
+    map.closeInfoWindow();
+    map.openInfoWindow(infoWindow, point);
+  });
+
+  // 存储引用
+  if (!markers[spot.level]) markers[spot.level] = [];
+  markers[spot.level].push(marker);
+});
+
+console.log('✅ 点值法标记加载完成，共 ' + osmanthusSpots.length + ' 个赏樱地点');
+
+// 图例标记也用同样的樱花图标
+document.querySelectorAll('.legend-flower').forEach(function(c){var lv=c.dataset.level;var cfg={major:{size:44,clusters:5,petal:'#f07088',center:'#d04060'},medium:{size:32,clusters:3,petal:'#f598a8',center:'#e06078'},minor:{size:22,clusters:1,petal:'#fcc0d0',center:'#f08898'}}[lv];var S=parseInt(c.width),ctx=c.getContext('2d');ctx.clearRect(0,0,S,S);var cx=S/2,cy=S/2;function draw(x,y,r){for(var i=0;i<5;i++){var a=-Math.PI/2+i*Math.PI*2/5;ctx.fillStyle=cfg.petal;ctx.beginPath();ctx.ellipse(x+Math.cos(a)*r*0.38,y+Math.sin(a)*r*0.38,r*0.3,r*0.45,a,0,Math.PI*2);ctx.fill()}var g=ctx.createRadialGradient(x,y,0,x,y,r*0.25);g.addColorStop(0,'#fffefc');g.addColorStop(0.5,cfg.petal);g.addColorStop(1,cfg.center);ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r*0.25,0,Math.PI*2);ctx.fill()}if(cfg.clusters===1){draw(cx,cy,S*0.38)}else{var sp=S*0.22;var pos=cfg.clusters===5?[[0,-sp],[sp*0.85,-sp*0.3],[sp*0.55,sp*0.7],[-sp*0.55,sp*0.7],[-sp*0.85,-sp*0.3]]:[[0,-sp*0.7],[sp*0.65,sp*0.45],[-sp*0.65,sp*0.45]];pos.forEach(function(p){draw(cx+p[0],cy+p[1],S*0.2)})}});
+var majorSpots = osmanthusSpots.filter(function(s) { return s.level === 'major'; });
+console.log('✅ 范围法影响力圈加载完成，共 ' + majorSpots.length + ' 个核心圈');
+
+// ============================================================
+// 分区统计图表法 - 各区中心放置饼图（万株/千株/百株占比）
+// ============================================================
+(function drawDistrictCharts() {
+  // 统计每个区各级别数量
+  var districtStats = {};
+  osmanthusSpots.forEach(function(s) {
+    if (!districtStats[s.district]) districtStats[s.district] = { major:0, medium:0, minor:0, total:0 };
+    districtStats[s.district][s.level]++;
+    districtStats[s.district].total++;
+  });
+
+  var centers = {
+    '洪山区':   [114.39,30.51], '武昌区':[114.32,30.55], '江岸区':[114.30,30.62],
+    '汉阳区':   [114.25,30.55], '青山区':[114.40,30.63], '江汉区':[114.27,30.60],
+    '东西湖区': [114.15,30.63], '新洲区':[114.80,30.85], '黄陂区':[114.40,31.00],
+    '蔡甸区':   [114.05,30.50], '江夏区':[114.33,30.38], '硚口区':[114.21,30.58],
+    '汉南区':   [114.08,30.31]
+  };
+
+  var pieColors = { major: '#d4687c', medium: '#f0a0b8', minor: '#fcd0dc' };
+
+  Object.keys(centers).forEach(function(name) {
+    var stats = districtStats[name];
+    if (!stats || stats.total === 0) return;
+    var lng = centers[name][0], lat = centers[name][1];
+
+    var S = 44, DPR = 2;
+    var c = document.createElement('canvas');
+    c.width = S * DPR; c.height = S * DPR;
+    var ctx = c.getContext('2d');
+    ctx.scale(DPR, DPR);
+    var cx = S/2, cy = S/2, R = S*0.38;
+
+    // 白色底圆
+    ctx.fillStyle = 'rgba(255,252,253,0.9)';
+    ctx.beginPath(); ctx.arc(cx, cy, R+4, 0, Math.PI*2); ctx.fill();
+
+    // 画饼图
+    var angles = [];
+    var total = stats.total;
+    var startAngle = -Math.PI/2;
+    var order = ['major','medium','minor'];
+    order.forEach(function(lv) {
+      if (stats[lv] === 0) return;
+      var sliceAngle = (stats[lv] / total) * Math.PI * 2;
+      ctx.fillStyle = pieColors[lv];
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, R, startAngle, startAngle + sliceAngle);
+      ctx.closePath();
+      ctx.fill();
+      startAngle += sliceAngle;
+    });
+
+    // 内圆（小一点，让色环更明显）
+    ctx.fillStyle = 'rgba(255,252,253,0.9)';
+    ctx.beginPath(); ctx.arc(cx, cy, R*0.22, 0, Math.PI*2); ctx.fill();
+
+    // 总数
+    ctx.fillStyle = '#5d2a3a';
+    ctx.font = 'bold 11px "STSong","KaiTi",serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(stats.total, cx, cy + 3);
+
+    // 区名
+    ctx.fillStyle = '#8b3a50';
+    ctx.font = '8px "STSong","KaiTi",serif';
+    ctx.fillText(name.replace('区',''), cx, cy + R + 10);
+
+    var icon = new BMapGL.Icon(c.toDataURL(), new BMapGL.Size(S*DPR, S*DPR), {
+      anchor: new BMapGL.Size(S*DPR/2, S*DPR/2),
+      imageSize: new BMapGL.Size(S*DPR, S*DPR)
+    });
+    map.addOverlay(new BMapGL.Marker(new BMapGL.Point(lng, lat), { icon: icon }));
+  });
+  console.log('✅ 分区统计图表法（饼图）加载完成');
+})();
+
+// ============================================================
+// 初始化地图 - 异步加载分级统计图层
+// ============================================================
+setTimeout(async () => {
+  await renderChoropleth();
+  var allPoints = [];
+  osmanthusSpots.forEach(function(s) {
+    if (s.lng && s.lat && s.lng > 110 && s.lng < 120 && s.lat > 25 && s.lat < 35) {
+      allPoints.push(new BMapGL.Point(s.lng, s.lat));
+    }
+  });
+  if (allPoints.length > 0) {
+    try {
+      map.setViewport(allPoints, { margins: [60, 420, 60, 60] });
+    } catch(e) {
+      map.centerAndZoom(new BMapGL.Point(114.30, 30.58), 11);
+    }
+  }
+}, 800);
+
+// ============================================================
+// 统计图表法 - 侧边栏Canvas柱状图
+// ============================================================
+(function drawChart() {
+  const canvas = document.getElementById('chart-canvas');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+
+  // 设置Canvas实际尺寸
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const W = rect.width - 36; // panel padding
+  const H = 200;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.scale(dpr, dpr);
+
+  // 筛选有数据的区并排序
+  const districts = Object.entries(districtData)
+    .filter(([_, d]) => d.count > 0)
+    .sort((a, b) => b[1].count - a[1].count);
+
+  const padding = { top: 10, right: 20, bottom: 50, left: 50 };
+  const chartW = W - padding.left - padding.right;
+  const chartH = H - padding.top - padding.bottom;
+  const barGap = 6;
+  const barW = Math.min(28, (chartW - barGap * (districts.length - 1)) / districts.length);
+  const maxVal = Math.max(...districts.map(d => d[1].count)) + 2;
+
+  // 背景
+  ctx.fillStyle = '#fefafc';
+  ctx.fillRect(0, 0, W, H);
+
+  // Y轴
+  ctx.strokeStyle = '#d0a0b0';
+  ctx.lineWidth = 0.5;
+  ctx.beginPath();
+  ctx.moveTo(padding.left, padding.top);
+  ctx.lineTo(padding.left, padding.top + chartH);
+  ctx.lineTo(padding.left + chartW, padding.top + chartH);
+  ctx.stroke();
+
+  // Y轴刻度
+  ctx.fillStyle = '#8b3a50';
+  ctx.font = '10px "STSong","KaiTi",serif';
+  ctx.textAlign = 'right';
+  for (let i = 0; i <= maxVal; i += 2) {
+    const y = padding.top + chartH - (i / maxVal) * chartH;
+    ctx.fillText(i, padding.left - 6, y + 4);
+    ctx.strokeStyle = '#f0d0d8';
+    ctx.beginPath();
+    ctx.moveTo(padding.left, y);
+    ctx.lineTo(padding.left + chartW, y);
+    ctx.stroke();
+  }
+
+  // 柱状图
+  districts.forEach(function([name, data], idx) {
+    const x = padding.left + idx * (barW + barGap) + barGap / 2;
+    const barH = (data.count / maxVal) * chartH;
+    const y = padding.top + chartH - barH;
+
+    // 渐变柱体
+    const grad = ctx.createLinearGradient(x, y, x, padding.top + chartH);
+    const baseColor = data.color;
+    grad.addColorStop(0, baseColor);
+    grad.addColorStop(1, '#fce8ec');
+    ctx.fillStyle = grad;
+    ctx.fillRect(x, y, barW, barH);
+
+    // 柱体顶部高光
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.fillRect(x, y, barW, 3);
+
+    // 边框
+    ctx.strokeStyle = 'rgba(139,69,80,0.3)';
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(x, y, barW, barH);
+
+    // 数值标签
+    ctx.fillStyle = '#6b2a3a';
+    ctx.font = 'bold 11px "STSong","KaiTi",serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(data.count, x + barW / 2, y - 6);
+
+    // X轴标签
+    ctx.fillStyle = '#5d2a3a';
+    ctx.font = '10px "STSong","KaiTi",serif';
+    ctx.save();
+    ctx.translate(x + barW / 2, padding.top + chartH + 10);
+    ctx.rotate(-Math.PI / 5);
+    ctx.textAlign = 'right';
+    ctx.fillText(name.replace('区',''), 0, 0);
+    ctx.restore();1
+  });
+
+  // 标题
+  ctx.fillStyle = '#8b3a50';
+  ctx.font = 'bold 12px "STSong","KaiTi",serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('武汉市各区樱花景点数量分布', W / 2, H - 4);
+})();
+
+// ============================================================
+// 地图加载完成
+// ============================================================
+map.addEventListener('tilesloaded', function() {
+  console.log('🗺️ 百度地图底图加载完成');
+});
+
+console.log('🌼 武汉市春季樱花景象空间分布专题地图初始化完成');
+console.log('   制图方法：分级统计图法 + 点值法 + 统计图表法 + 范围法');
+console.log('   共计景点：' + osmanthusSpots.length + ' 个赏樱地点');
+console.log('   覆盖区域：' + Object.keys(districtData).filter(k => districtData[k].count > 0).length + ' 个行政区');
+</script>
+</body>
+</html>
