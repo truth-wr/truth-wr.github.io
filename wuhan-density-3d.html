@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>武汉人群密度热力地图</title>
+<link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f8f7f4;--card:#ffffff;--ink:#4a4a42;--accent:#6e9b7e;--accent2:#93b89e;--accent3:#b8d5c0;--border:#e2e0da;--tag:#eef5ee;--shadow:rgba(100,120,100,0.06)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"Noto Serif SC",serif;background:var(--bg);height:100vh;overflow:hidden}
+#topbar{position:relative;z-index:200;background:#fff;border-bottom:1px solid var(--border);padding:10px 22px;display:flex;align-items:center;gap:12px;box-shadow:0 1px 4px var(--shadow)}
+#topbar .logo{font-size:1.4rem;opacity:.85}
+#topbar h1{font-family:"Ma Shan Zheng",cursive;font-size:1.45rem;color:var(--accent);letter-spacing:.06em;font-weight:400}
+#topbar .sub{font-size:.66rem;color:#9aa89a}
+#district-nav{position:relative;z-index:199;background:linear-gradient(180deg,#f8faf7,#f4f6f3);border-bottom:1px solid var(--border);padding:8px 18px;display:flex;align-items:center;gap:5px;overflow-x:auto;white-space:nowrap;scrollbar-width:none;-ms-overflow-style:none}
+#district-nav::-webkit-scrollbar{height:0}
+#district-nav .nav-label{font-size:.65rem;color:#a0aea0;margin-right:6px;flex-shrink:0;letter-spacing:.04em}
+.dnav-btn{flex-shrink:0;background:#fff;border:1px solid var(--border);border-radius:14px;padding:4px 11px;font-size:.64rem;color:var(--ink);cursor:pointer;font-family:inherit;transition:.18s;white-space:nowrap}
+.dnav-btn:hover{border-color:var(--accent2);background:var(--tag);color:var(--accent)}
+.dnav-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.dnav-btn .dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px;vertical-align:middle;position:relative;top:-1px}
+#map-wrap{position:relative;height:calc(100vh - 104px)}
+#map{width:100%;height:100%}
+#left-panel{position:absolute;top:12px;left:14px;z-index:1000;width:178px;max-height:calc(100vh - 140px);overflow-y:auto;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:13px 14px;box-shadow:0 2px 14px var(--shadow)}
+#left-panel h3{font-family:"Ma Shan Zheng",cursive;font-size:.8rem;color:var(--accent);margin:4px 0 3px;padding-bottom:3px;border-bottom:1px solid var(--border);font-weight:400}
+.stat-row{display:flex;justify-content:space-between;font-size:.65rem;color:#8a9485;margin:2px 0}
+.stat-row .val{color:var(--accent);font-weight:600;font-size:.8rem}
+.rank-item{display:flex;align-items:center;gap:5px;font-size:.63rem;color:var(--ink);margin:2px 0;padding:3px 5px;border-radius:5px;cursor:pointer;transition:.15s}
+.rank-item:hover{background:var(--tag)}
+.rank-item .idx{width:16px;height:16px;border-radius:50%;text-align:center;line-height:16px;font-size:.58rem;color:#fff;flex-shrink:0;font-weight:600}
+.rank-item .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rank-item .dv{color:var(--accent);font-weight:600;font-size:.6rem;flex-shrink:0}
+#legend{position:absolute;bottom:26px;right:16px;z-index:1000;background:rgba(255,255,255,.97);border:1px solid var(--border);border-radius:10px;padding:11px 13px;box-shadow:0 2px 14px var(--shadow)}
+#legend h3{font-family:"Ma Shan Zheng",cursive;font-size:.74rem;color:var(--accent);margin-bottom:5px;font-weight:400}
+.leg-bar{display:flex;align-items:center;gap:6px;margin:3px 0}
+.leg-swatch{width:32px;height:9px;border-radius:3px;flex-shrink:0}
+.leg-label{font-size:.58rem;color:#7a8a7e;white-space:nowrap}
+#hint{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);z-index:999;background:rgba(255,255,255,.9);border:1px solid var(--border);border-radius:14px;padding:4px 12px;font-size:.6rem;color:#9aaa9a;pointer-events:none}
+#left-panel::-webkit-scrollbar,#legend::-webkit-scrollbar{width:3px}
+#left-panel::-webkit-scrollbar-thumb,#legend::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+@media(max-width:768px){#left-panel{display:none}#district-nav{padding:6px 10px}.dnav-btn{padding:3px 8px;font-size:.6rem}}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <span class="logo">🏙️</span>
+  <h1>武汉人群密度热力图</h1>
+  <span class="sub">3D 柱状可视化 · 十三区密度对比</span>
+</div>
+
+<div id="district-nav">
+  <span class="nav-label">📍 快速导航</span>
+  <button class="dnav-btn active" onclick="navDistrict('全部',this)">概览</button>
+  <div id="dnav-btns" style="display:contents"></div>
+</div>
+
+<div id="map-wrap">
+  <div id="map"></div>
+  <div id="left-panel">
+    <h3>数据总览</h3>
+    <div class="stat-row"><span>覆盖区域</span><span class="val">13 区</span></div>
+    <div class="stat-row"><span>总人口</span><span class="val" id="total-pop">-</span></div>
+    <div class="stat-row"><span>最高密度</span><span class="val" id="max-dens">-</span></div>
+    <div class="stat-row"><span>平均密度</span><span class="val" id="avg-dens">-</span></div>
+    <h3>密度排行</h3>
+    <div id="rank-list"></div>
+    <h3>柱体颜色</h3>
+    <div id="leg-compact"></div>
+  </div>
+  <div id="hint">💡 3D 柱体高度代表人口密度 · 点击柱体查看详情 · 滚轮缩放</div>
+  <div id="legend">
+    <h3>密度色阶 (人/km²)</h3>
+    <div id="leg-content"></div>
+  </div>
+</div>
+
+<script src="https://api.map.baidu.com/api?type=webgl&v=1.0&ak=szmJ5Oc3byDHwzN2BEyJbORdKlKXcGdk"></script>
+<script>
+// ========== 模拟数据 ==========
+var districts=[
+  {n:'江汉区',lng:114.278,lat:30.601,pop:72,area:33.4,dens:21560,desc:'武汉人口密度之巅·商贸金融中心'},
+  {n:'武昌区',lng:114.322,lat:30.553,pop:128,area:87.4,dens:14650,desc:'高校云集·黄鹤楼所在·文教心脏'},
+  {n:'江岸区',lng:114.300,lat:30.610,pop:98,area:80.3,dens:12200,desc:'汉口核心老城·租界风情·商业繁华'},
+  {n:'硚口区',lng:114.230,lat:30.580,pop:86,area:84.0,dens:10240,desc:'老工业基地转型·汉正街商贸活跃'},
+  {n:'汉阳区',lng:114.250,lat:30.550,pop:67,area:108.3,dens:6190,desc:'知音故里·生态宜居·人口稳步增长'},
+  {n:'青山区',lng:114.400,lat:30.630,pop:48,area:80.5,dens:5960,desc:'钢铁重镇·滨江而兴·产业人口集中'},
+  {n:'洪山区',lng:114.360,lat:30.520,pop:175,area:509.0,dens:3440,desc:'大学之城·光谷核心·面积最大主城区'},
+  {n:'东西湖区',lng:114.150,lat:30.630,pop:52,area:495,dens:1050,desc:'临空港开发区·食品物流产业集聚'},
+  {n:'新洲区',lng:114.800,lat:30.850,pop:88,area:1500,dens:590,desc:'阳逻港所在地·长江航运枢纽'},
+  {n:'汉南区',lng:114.080,lat:30.310,pop:16,area:287,dens:560,desc:'中国车谷核心·汽车全产业链基地'},
+  {n:'江夏区',lng:114.330,lat:30.380,pop:89,area:2018,dens:440,desc:'光谷南扩腹地·大学城新聚落'},
+  {n:'黄陂区',lng:114.400,lat:31.000,pop:98,area:2261,dens:430,desc:'木兰故里·武汉面积最大的行政区'},
+  {n:'蔡甸区',lng:114.050,lat:30.490,pop:45,area:1100,dens:410,desc:'后官湖畔·中法武汉生态示范城'}
+];
+
+var tiers=[
+  {max:800,  top:'#d0e8d4',side:'#b8d8c0',front:'#c8e0d0',label:'＜ 800'},
+  {max:2000, top:'#b0d8b8',side:'#94c4a0',front:'#a8d4b4',label:'800 – 2000'},
+  {max:6000, top:'#8cc898',side:'#6cb07c',front:'#80c090',label:'2000 – 6000'},
+  {max:12000,top:'#5eaa72',side:'#48925c',front:'#56a26a',label:'6000 – 12000'},
+  {max:20000,top:'#3d8a52',side:'#2d723c',front:'#358048',label:'12000 – 20000'},
+  {max:99999,top:'#226838',side:'#185028',front:'#1c5c30',label:'＞ 20000'}
+];
+function getColors(dens){
+  for(var i=0;i<tiers.length;i++){if(dens<tiers[i].max)return tiers[i];}
+  return tiers[tiers.length-1];
+}
+
+// ========== 初始化地图 ==========
+var m=new BMapGL.Map("map",{minZoom:9,maxZoom:18});
+m.centerAndZoom(new BMapGL.Point(114.30,30.58),11);
+m.enableScrollWheelZoom(true);
+m.addControl(new BMapGL.ScaleControl({anchor:BMAP_ANCHOR_BOTTOM_RIGHT,offset:new BMapGL.Size(20,30)}));
+m.addControl(new BMapGL.ZoomControl({anchor:BMAP_ANCHOR_BOTTOM_RIGHT,offset:new BMapGL.Size(20,90)}));
+
+// ========== 武汉市边界 ==========
+setTimeout(function(){
+  var cb=new BMapGL.Boundary();
+  cb.get("武汉市",function(rs){
+    if(rs&&rs.boundaries)rs.boundaries.forEach(function(b){
+      var pts=b.split(";").map(function(p){var pp=p.split(",");return new BMapGL.Point(parseFloat(pp[0]),parseFloat(pp[1]));});
+      m.addOverlay(new BMapGL.Polygon(pts,{strokeColor:"#6e9b7e",strokeWeight:3,strokeOpacity:.7,fillColor:"transparent",fillOpacity:0}));
+      m.addOverlay(new BMapGL.Polygon(pts,{strokeColor:"#b8d5c0",strokeWeight:1.5,strokeOpacity:.4,fillColor:"transparent",fillOpacity:0,strokeStyle:"dashed"}));
+    });
+  });
+},300);
+
+// ========== Canvas 自绘 3D 柱体 (Custom Overlay) ==========
+function ColumnOverlay(districts, map){
+  this._districts = districts;
+  this._map = map;
+}
+ColumnOverlay.prototype = new BMapGL.Overlay();
+
+ColumnOverlay.prototype.initialize = function(map){
+  this._map = map;
+  var canvas = document.createElement('canvas');
+  canvas.style.position = 'absolute';
+  canvas.style.left = '0';
+  canvas.style.top = '0';
+  canvas.style.pointerEvents = 'none'; // let clicks pass through
+  canvas.id = 'columnCanvas';
+  this._canvas = canvas;
+
+  // Clickable marker layer
+  var clickCanvas = document.createElement('canvas');
+  clickCanvas.style.position = 'absolute';
+  clickCanvas.style.left = '0';
+  clickCanvas.style.top = '0';
+  clickCanvas.style.pointerEvents = 'auto';
+  clickCanvas.id = 'clickCanvas';
+  this._clickCanvas = clickCanvas;
+
+  var pane = map.getPanes().floatPane;
+  pane.appendChild(canvas);
+  pane.appendChild(clickCanvas);
+
+  this._resize();
+  this._draw();
+  this._bindEvents();
+  return canvas;
+};
+
+ColumnOverlay.prototype._resize = function(){
+  var size = this._map.getSize();
+  this._canvas.width = size.width;
+  this._canvas.height = size.height;
+  this._clickCanvas.width = size.width;
+  this._clickCanvas.height = size.height;
+};
+
+ColumnOverlay.prototype.draw = function(){
+  this._resize();
+  this._draw();
+};
+
+// Height calculation: log scale for visual balance
+// Using sqrt(dens) * 3.5 → pixel height on screen
+ColumnOverlay.prototype._calcPixelHeight = function(dens){
+  return Math.sqrt(dens) * 3.5; // pixel height
+};
+
+ColumnOverlay.prototype._draw = function(){
+  var ctx = this._canvas.getContext('2d');
+  var clickCtx = this._clickCanvas.getContext('2d');
+  var w = this._canvas.width, h = this._canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  clickCtx.clearRect(0, 0, w, h);
+
+  var self = this;
+  this._hitAreas = [];
+
+  // Sort by density ascending so tall columns are drawn last (on top)
+  var sorted = [].concat(this._districts).sort(function(a,b){return a.dens - b.dens;});
+
+  sorted.forEach(function(d){
+    var proj = self._map.pointToPixel(new BMapGL.Point(d.lng, d.lat));
+    if(!proj) return;
+    var cx = proj.x, cy = proj.y;
+    var barW = 14; // bar width in pixels
+    var barH = self._calcPixelHeight(d.dens);
+    var tc = getColors(d.dens);
+
+    // Skip if offscreen
+    if(cx < -50 || cx > w+50 || cy < -50 || cy > h+50) return;
+
+    var baseY = cy;
+    var topY = cy - barH;
+
+    // 3D isometric offset
+    var isoX = 8;
+    var isoY = 5;
+
+    // --- Draw 3D bar ---
+    // Top face (parallelogram)
+    ctx.beginPath();
+    ctx.moveTo(cx - barW/2, topY);
+    ctx.lineTo(cx + barW/2, topY);
+    ctx.lineTo(cx + barW/2 + isoX, topY - isoY);
+    ctx.lineTo(cx - barW/2 + isoX, topY - isoY);
+    ctx.closePath();
+    ctx.fillStyle = tc.top;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+
+    // Right side face
+    ctx.beginPath();
+    ctx.moveTo(cx + barW/2, topY);
+    ctx.lineTo(cx + barW/2 + isoX, topY - isoY);
+    ctx.lineTo(cx + barW/2 + isoX, baseY - isoY);
+    ctx.lineTo(cx + barW/2, baseY);
+    ctx.closePath();
+    ctx.fillStyle = tc.side;
+    ctx.fill();
+    ctx.stroke();
+
+    // Front face
+    ctx.beginPath();
+    ctx.moveTo(cx - barW/2, topY);
+    ctx.lineTo(cx + barW/2, topY);
+    ctx.lineTo(cx + barW/2, baseY);
+    ctx.lineTo(cx - barW/2, baseY);
+    ctx.closePath();
+    ctx.fillStyle = tc.front;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Bottom shadow line
+    ctx.beginPath();
+    ctx.moveTo(cx - barW/2, baseY);
+    ctx.lineTo(cx + barW/2, baseY);
+    ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // District name label on top
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 8px "Noto Serif SC",sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(d.n, cx + isoX/2, topY - isoY - 3);
+
+    // Store hit area for click detection
+    self._hitAreas.push({
+      cx: cx, cy: cy, barW: barW, barH: barH, isoX: isoX, isoY: isoY,
+      district: d
+    });
+
+    // Draw invisible click target
+    clickCtx.fillStyle = 'rgba(0,0,0,0.01)';
+    clickCtx.fillRect(cx - barW/2, topY - isoY - 10, barW + isoX, barH + isoY + 10);
+  });
+};
+
+ColumnOverlay.prototype._bindEvents = function(){
+  var self = this;
+  this._clickCanvas.addEventListener('click', function(e){
+    var rect = self._clickCanvas.getBoundingClientRect();
+    var mx = e.clientX - rect.left;
+    var my = e.clientY - rect.top;
+
+    // Check hit areas
+    for(var i = self._hitAreas.length - 1; i >= 0; i--){
+      var ha = self._hitAreas[i];
+      var left = ha.cx - ha.barW/2;
+      var top = ha.cy - ha.barH - ha.isoY - 10;
+      var right = left + ha.barW + ha.isoX;
+      var bottom = ha.cy + 5;
+
+      if(mx >= left && mx <= right && my >= top && my <= bottom){
+        showInfo(ha.district);
+        return;
+      }
+    }
+  });
+};
+
+function showInfo(d){
+  var hPx = Math.round(Math.sqrt(d.dens) * 3.5);
+  var html='<div style="padding:0;border-radius:12px;overflow:hidden;min-width:260px;background:#fff;font-family:Noto Serif SC,serif;box-shadow:0 4px 24px rgba(100,120,100,0.12)">'+
+    '<div style="background:linear-gradient(135deg,#f8faf7,#eef5ee);padding:15px 16px 11px;text-align:center;border-bottom:1px solid #dde5db">'+
+    '<div style="font-family:Ma Shan Zheng,cursive;font-size:1.15rem;color:#6e9b7e;font-weight:400">'+d.n+'</div>'+
+    '<div style="font-size:.64rem;color:#8a9c8e;margin-top:2px">'+d.desc+'</div></div>'+
+    '<div style="padding:12px 16px">'+
+    '<div style="font-size:.7rem;color:#4a4a42;margin:6px 0">👥 常住人口 <b>'+(d.pop*10)+'</b> 万人</div>'+
+    '<div style="font-size:.7rem;color:#4a4a42;margin:6px 0">📐 区域面积 <b>'+d.area+'</b> km²</div>'+
+    '<div style="font-size:.74rem;color:#6e9b7e;margin:6px 0;font-weight:700">📊 人口密度 <b>'+d.dens.toLocaleString()+'</b> 人/km²</div>'+
+    '<div style="font-size:.6rem;color:#a0b0a0;margin:6px 0">🔺 柱体高度 '+hPx+'px（屏幕像素）</div>'+
+    '</div></div>';
+  m.openInfoWindow(new BMapGL.InfoWindow(html,{width:280}),new BMapGL.Point(d.lng,d.lat));
+  m.panTo(new BMapGL.Point(d.lng,d.lat-0.003));
+}
+
+// ========== 添加自定义覆盖物 ==========
+var colOverlay = null;
+m.addEventListener("tilesloaded", function(){
+  if(colOverlay){ m.removeOverlay(colOverlay); }
+  colOverlay = new ColumnOverlay(districts, m);
+  m.addOverlay(colOverlay);
+});
+// Also redraw on zoom/move
+m.addEventListener("zoomend", function(){
+  if(colOverlay) colOverlay.draw();
+});
+m.addEventListener("moveend", function(){
+  if(colOverlay) colOverlay.draw();
+});
+
+// ========== 左侧面板 ==========
+var totalPop=districts.reduce(function(s,d){return s+d.pop*10;},0);
+var densVals=districts.map(function(d){return d.dens;});
+document.getElementById("total-pop").textContent=(totalPop/100).toFixed(0)+' 万';
+document.getElementById("max-dens").textContent=Math.max.apply(null,densVals).toLocaleString();
+document.getElementById("avg-dens").textContent=Math.round(densVals.reduce(function(a,b){return a+b;},0)/districts.length).toLocaleString();
+
+var sorted=[].concat(districts).sort(function(a,b){return b.dens-a.dens;});
+var rankHtml="";
+sorted.forEach(function(d,i){
+  var bg=i<3?'#6e9b7e':i<6?'#93b89e':'#b8d5c0';
+  var txt=i<3?'#fff':'#4a4a42';
+  rankHtml+='<div class="rank-item" onclick="flyTo('+d.lng+','+d.lat+',\''+d.n+'\')">'+
+    '<span class="idx" style="background:'+bg+';color:'+txt+'">'+(i+1)+'</span>'+
+    '<span class="nm">'+d.n+'</span>'+
+    '<span class="dv">'+d.dens.toLocaleString()+'</span></div>';
+});
+document.getElementById("rank-list").innerHTML=rankHtml;
+
+var legC="";
+tiers.forEach(function(t){
+  legC+='<div class="leg-bar"><span class="leg-swatch" style="background:'+t.front+'"></span><span class="leg-label" style="font-size:.58rem">'+t.label+'</span></div>';
+});
+document.getElementById("leg-compact").innerHTML=legC;
+document.getElementById("leg-content").innerHTML=legC;
+
+// ========== 区域导航栏 ==========
+var navHtml="";
+districts.forEach(function(d){
+  var tc=getColors(d.dens);
+  navHtml+='<button class="dnav-btn" onclick="navDistrict(\''+d.n+'\',this)" style="--dot:'+tc.front+'">'+
+    '<span class="dot" style="background:'+tc.front+'"></span>'+d.n+'</button>';
+});
+document.getElementById("dnav-btns").innerHTML=navHtml;
+
+function navDistrict(name,btn){
+  document.querySelectorAll(".dnav-btn").forEach(function(b){b.classList.remove("active");});
+  if(btn)btn.classList.add("active");
+  if(name==="全部"){ m.centerAndZoom(new BMapGL.Point(114.30,30.58),11); return; }
+  var d=districts.find(function(x){return x.n===name;});
+  if(d){ m.centerAndZoom(new BMapGL.Point(d.lng,d.lat),14); }
+}
+
+function flyTo(lng,lat,name){
+  m.centerAndZoom(new BMapGL.Point(lng,lat),14);
+  document.querySelectorAll(".dnav-btn").forEach(function(b){b.classList.remove("active");});
+  var btns=document.querySelectorAll(".dnav-btn");
+  btns.forEach(function(b){if(b.textContent.replace(/[•●]/,'').trim()===name)b.classList.add("active");});
+}
+</script>
+</body>
+</html>
