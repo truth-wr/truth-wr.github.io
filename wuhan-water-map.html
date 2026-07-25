@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>百湖润花——武汉水系分布图</title>
+<link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f7f8f5;--card:#ffffff;--ink:#4a4a42;--accent:#3b7a9e;--accent2:#5a9ab8;--accent3:#a8d0e8;--border:#d8e2e8;--tag:#eef5fa;--shadow:rgba(80,110,140,0.06)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"Noto Serif SC",serif;background:var(--bg);height:100vh;overflow:hidden}
+#topbar{position:relative;z-index:200;background:#fff;border-bottom:1px solid var(--border);padding:10px 22px;display:flex;align-items:center;gap:12px;box-shadow:0 1px 4px var(--shadow)}
+#topbar .logo{font-size:1.4rem;opacity:.85}
+#topbar h1{font-family:"Ma Shan Zheng",cursive;font-size:1.45rem;color:var(--accent);letter-spacing:.06em;font-weight:400}
+#topbar .sub{font-size:.66rem;color:#8a9caa}
+#map-wrap{position:relative;height:calc(100vh - 56px)}
+#map{width:100%;height:100%}
+#left-panel{position:absolute;top:12px;left:14px;z-index:1000;width:178px;max-height:calc(100vh - 100px);overflow-y:auto;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:13px 14px;box-shadow:0 2px 14px var(--shadow)}
+#left-panel h3{font-family:"Ma Shan Zheng",cursive;font-size:.8rem;color:var(--accent);margin:5px 0 4px;padding-bottom:3px;border-bottom:1px solid var(--border);font-weight:400}
+.stat-row{display:flex;justify-content:space-between;font-size:.65rem;color:#809098;margin:2px 0}
+.stat-row .val{color:var(--accent);font-weight:600;font-size:.8rem}
+.water-item{display:flex;align-items:center;gap:5px;font-size:.62rem;color:var(--ink);margin:2px 0;padding:3px 5px;border-radius:5px;cursor:pointer;transition:.15s}
+.water-item:hover{background:var(--tag)}
+.water-item .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.water-item .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.water-item .sz{color:var(--accent);font-size:.56rem;flex-shrink:0}
+#legend{position:absolute;bottom:26px;right:16px;z-index:1000;background:rgba(255,255,255,.97);border:1px solid var(--border);border-radius:10px;padding:11px 13px;box-shadow:0 2px 14px var(--shadow)}
+#legend h3{font-family:"Ma Shan Zheng",cursive;font-size:.74rem;color:var(--accent);margin-bottom:5px;font-weight:400}
+.leg-row{display:flex;align-items:center;gap:6px;margin:3px 0;font-size:.58rem;color:#708088}
+.leg-swatch{width:28px;height:9px;border-radius:3px;flex-shrink:0}
+.leg-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+#left-panel::-webkit-scrollbar,#legend::-webkit-scrollbar{width:3px}
+#left-panel::-webkit-scrollbar-thumb,#legend::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+@media(max-width:768px){#left-panel{display:none}}
+</style>
+</head>
+<body>
+<div id="topbar">
+  <span class="logo">💧</span>
+  <h1>百湖润花——武汉水系分布图</h1>
+  <span class="sub">数据来源: 天地图 WFS · 真实水系数据</span>
+</div>
+<div id="map-wrap">
+  <div id="map"></div>
+  <div id="left-panel">
+    <h3>水系总览</h3>
+    <div class="stat-row"><span>主要湖泊</span><span class="val" id="lake-count">-</span></div>
+    <div class="stat-row"><span>主要河流</span><span class="val" id="river-count">-</span></div>
+    <h3>主要湖泊</h3>
+    <div id="lake-list"></div>
+    <h3>主要河流</h3>
+    <div id="river-list"></div>
+  </div>
+  <div id="legend">
+    <h3>图例</h3>
+    <div class="leg-row"><span class="leg-swatch" style="background:#3b7a9e;height:3px;border-radius:2px"></span> 河流（天地图HYDL）</div>
+    <div class="leg-row"><span class="leg-dot" style="background:rgba(59,122,158,0.45)"></span> 大型湖泊（&gt;50 km²）</div>
+    <div class="leg-row"><span class="leg-dot" style="background:rgba(90,154,184,0.40)"></span> 中型湖泊（10-50 km²）</div>
+    <div class="leg-row"><span class="leg-dot" style="background:rgba(120,180,210,0.35)"></span> 小型湖泊（&lt;10 km²）</div>
+  </div>
+</div>
+<script src="https://api.map.baidu.com/api?type=webgl&v=1.0&ak=szmJ5Oc3byDHwzN2BEyJbORdKlKXcGdk"></script>
+<script src="wuhan_water_data.js"></script>
+<script src="wuhan_boundary.js"></script>
+<script>
+var m=new BMapGL.Map("map",{minZoom:9,maxZoom:18});
+m.centerAndZoom(new BMapGL.Point(114.30,30.58),11);
+m.enableScrollWheelZoom(true);
+m.addControl(new BMapGL.ScaleControl({anchor:BMAP_ANCHOR_BOTTOM_RIGHT,offset:new BMapGL.Size(20,30)}));
+m.addControl(new BMapGL.ZoomControl({anchor:BMAP_ANCHOR_BOTTOM_RIGHT,offset:new BMapGL.Size(20,90)}));
+
+function insideWuhan(lng, lat) {
+  var ring = WUHAN_BOUNDARY[1][0];
+  for (var i = 0, j = ring.length - 1, inside = false; i < ring.length; j = i++) {
+    var xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+    if ((yi > lat) !== (yj > lat) && lng < (xj - xi) * (lat - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+function lakeColor(a){
+  if(a>50) return {f:'rgba(59,122,158,0.45)',s:'rgba(40,90,120,0.7)'};
+  if(a>10) return {f:'rgba(90,154,184,0.40)',s:'rgba(60,120,150,0.6)'};
+  return {f:'rgba(120,180,210,0.35)',s:'rgba(80,140,170,0.5)'};
+}
+
+var lakeCount = 0;
+WATER_LAKES.forEach(function(lake){
+  if(!lake.ring || lake.ring.length<3 || !lake.center) return;
+  var inCount = lake.ring.filter(function(p){return insideWuhan(p[0],p[1]);}).length;
+  if(inCount < lake.ring.length * 0.5 || !insideWuhan(lake.center[0], lake.center[1])) return;
+  var pts = lake.ring.map(function(p){return new BMapGL.Point(p[0],p[1]);});
+  var col = lakeColor(lake.area_km2);
+  var poly = new BMapGL.Polygon(pts,{strokeColor:col.s,strokeWeight:1.5,strokeOpacity:0.7,fillColor:col.f,fillOpacity:0.45});
+  m.addOverlay(poly);
+  lakeCount++;
+  if(lake.area_km2 > 3){
+    poly.addEventListener("click",function(){
+      var t = lake.area_km2>50?'大型':(lake.area_km2>10?'中型':'小型');
+      var h='<div style="padding:0;border-radius:12px;overflow:hidden;min-width:220px;background:#fff;font-family:Noto Serif SC,serif;box-shadow:0 4px 24px rgba(80,110,140,0.12)">'+
+        '<div style="background:linear-gradient(135deg,#f5f8fa,#e8f2f8);padding:13px 14px 9px;text-align:center;border-bottom:1px solid #d0e0ea">'+
+        '<div style="font-family:Ma Shan Zheng,cursive;font-size:1.1rem;color:#3b7a9e;font-weight:400">'+lake.name+'</div>'+
+        '<div style="font-size:.62rem;color:#6a90a8;margin-top:2px">'+t+'湖泊 · 面积约 '+lake.area_km2.toFixed(1)+' km²</div></div></div>';
+      m.openInfoWindow(new BMapGL.InfoWindow(h,{width:240}),new BMapGL.Point(lake.center[0],lake.center[1]));
+    });
+  }
+});
+
+var riverCount = 0;
+WATER_RIVERS.forEach(function(river){
+  if(!river.path || river.path.length<2) return;
+  var inCount = river.path.filter(function(p){return insideWuhan(p[0],p[1]);}).length;
+  if(inCount < 6) return;
+  var pts = river.path.map(function(p){return new BMapGL.Point(p[0],p[1]);});
+  var w = river.length_km>30 ? 6 : (river.length_km>20 ? 4 : 2.5);
+  m.addOverlay(new BMapGL.Polyline(pts,{strokeColor:'#3b7a9e',strokeWeight:w,strokeOpacity:0.65}));
+  riverCount++;
+});
+
+WUHAN_BOUNDARY.forEach(function(part){
+  var pts = part[0].map(function(p){return new BMapGL.Point(p[0],p[1]);});
+  m.addOverlay(new BMapGL.Polygon(pts,{strokeColor:"#1a5a78",strokeWeight:4,strokeOpacity:0.85,fillColor:"transparent",fillOpacity:0}));
+  m.addOverlay(new BMapGL.Polygon(pts,{strokeColor:"#5aacd0",strokeWeight:2,strokeOpacity:0.5,fillColor:"transparent",fillOpacity:0,strokeStyle:"dashed"}));
+});
+
+document.getElementById("lake-count").textContent = lakeCount;
+document.getElementById("river-count").textContent = riverCount;
+
+var majorLakes = WATER_LAKES.filter(function(l){return l.area_km2>3 && l.center && insideWuhan(l.center[0],l.center[1]);});
+majorLakes.sort(function(a,b){return b.area_km2-a.area_km2;});
+var lakeHtml='';
+majorLakes.forEach(function(l){
+  var dotCol = lakeColor(l.area_km2).f;
+  lakeHtml+='<div class="water-item" onclick="m.centerAndZoom(new BMapGL.Point('+l.center[0]+','+l.center[1]+'),14)">'+
+    '<span class="dot" style="background:'+dotCol+'"></span>'+
+    '<span class="nm">'+l.name+'</span>'+
+    '<span class="sz">'+l.area_km2.toFixed(1)+'</span></div>';
+});
+document.getElementById("lake-list").innerHTML = lakeHtml;
+
+var majorRivers = WATER_RIVERS.filter(function(r){return r.name!='(未命名)' && r.length_km>12;});
+majorRivers.sort(function(a,b){return b.length_km-a.length_km;});
+var riverHtml='';
+majorRivers.forEach(function(r){
+  riverHtml+='<div class="water-item">'+
+    '<span class="dot" style="background:#3b7a9e"></span>'+
+    '<span class="nm">'+r.name+'</span>'+
+    '<span class="sz">'+r.length_km.toFixed(1)+'km</span></div>';
+});
+document.getElementById("river-list").innerHTML = riverHtml;
+</script>
+</body>
+</html>
