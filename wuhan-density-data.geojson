@@ -1,0 +1,20 @@
+{
+  "type": "FeatureCollection",
+  "name": "武汉十三区人口密度",
+  "description": "武汉市13个行政区模拟人口密度数据。pop_wan=人口(万), area_km2=面积(km²), dens=人口密度(人/km²)。3D可视化建议：heightField=dens, heightScale=0.05",
+  "features": [
+    {"type":"Feature","geometry":{"type":"Point","coordinates":[114.278,30.601]},"properties":{"name":"江汉区","pop_wan":72,"area_km2":33.4,"dens":21560,"rank":1,"desc":"武汉人口密度之巅·商贸金融中心"}},
+    {"type":"Feature","geometry":{"type":"Point","coordinates":[114.322,30.553]},"properties":{"name":"武昌区","pop_wan":128,"area_km2":87.4,"dens":14650,"rank":2,"desc":"高校云集·黄鹤楼所在·文教心脏"}},
+    {"type":"Feature","geometry":{"type":"Point","coordinates":[114.300,30.610]},"properties":{"name":"江岸区","pop_wan":98,"area_km2":80.3,"dens":12200,"rank":3,"desc":"汉口核心老城·租界风情·商业繁华"}},
+    {"type":"Feature","geometry":{"type":"Point","coordinates":[114.230,30.580]},"properties":{"name":"硚口区","pop_wan":86,"area_km2":84.0,"dens":10240,"rank":4,"desc":"老工业基地转型·汉正街商贸活跃"}},
+    {"type":"Feature","geometry":{"type":"Point","coordinates":[114.250,30.550]},"properties":{"name":"汉阳区","pop_wan":67,"area_km2":108.3,"dens":6190,"rank":5,"desc":"知音故里·生态宜居·人口稳步增长"}},
+    {"type":"Feature","geometry":{"type":"Point","coordinates":[114.400,30.630]},"properties":{"name":"青山区","pop_wan":48,"area_km2":80.5,"dens":5960,"rank":6,"desc":"钢铁重镇·滨江而兴·产业人口集中"}},
+    {"type":"Feature","geometry":{"type":"Point","coordinates":[114.360,30.520]},"properties":{"name":"洪山区","pop_wan":175,"area_km2":509.0,"dens":3440,"rank":7,"desc":"大学之城·光谷核心·面积最大主城区"}},
+    {"type":"Feature","geometry":{"type":"Point","coordinates":[114.150,30.630]},"properties":{"name":"东西湖区","pop_wan":52,"area_km2":495,"dens":1050,"rank":8,"desc":"临空港开发区·食品物流产业集聚"}},
+    {"type":"Feature","geometry":{"type":"Point","coordinates":[114.800,30.850]},"properties":{"name":"新洲区","pop_wan":88,"area_km2":1500,"dens":590,"rank":9,"desc":"阳逻港所在地·长江航运枢纽"}},
+    {"type":"Feature","geometry":{"type":"Point","coordinates":[114.080,30.310]},"properties":{"name":"汉南区","pop_wan":16,"area_km2":287,"dens":560,"rank":10,"desc":"中国车谷核心·汽车全产业链基地"}},
+    {"type":"Feature","geometry":{"type":"Point","coordinates":[114.330,30.380]},"properties":{"name":"江夏区","pop_wan":89,"area_km2":2018,"dens":440,"rank":11,"desc":"光谷南扩腹地·大学城新聚落"}},
+    {"type":"Feature","geometry":{"type":"Point","coordinates":[114.400,31.000]},"properties":{"name":"黄陂区","pop_wan":98,"area_km2":2261,"dens":430,"rank":12,"desc":"木兰故里·武汉面积最大的行政区"}},
+    {"type":"Feature","geometry":{"type":"Point","coordinates":[114.050,30.490]},"properties":{"name":"蔡甸区","pop_wan":45,"area_km2":1100,"dens":410,"rank":13,"desc":"后官湖畔·中法武汉生态示范城"}}
+  ]
+}

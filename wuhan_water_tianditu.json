@@ -1,0 +1,14 @@
+{
+  "source": "天地图API (Tianditu)",
+  "region": "武汉市",
+  "bounds": "113.7,29.9,115.2,31.3",
+  "fetch_time": "2026-07-02 18:57:27",
+  "lakes": [],
+  "rivers": [],
+  "reservoirs": [],
+  "summary": {
+    "total_lakes": 0,
+    "total_rivers": 0,
+    "total_reservoirs": 0
+  }
+}

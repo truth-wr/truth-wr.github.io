@@ -117,7 +117,8 @@ m.addControl(new BMapGL.ZoomControl({anchor:BMAP_ANCHOR_BOTTOM_RIGHT,offset:new 
 // ========== 武汉市边界 ==========
 setTimeout(function(){
   var cb=new BMapGL.Boundary();
-  cb.get("武汉市",function(rs){
+  cb.get("武汉市",function(rs){if(rs&&rs.boundaries)rs.boundaries.forEach(function(b){var pts=b.split(";").map(function(p){var pp=p.split(",");return new BMapGL.Point(parseFloat(pp[0]),parseFloat(pp[1]));});m.addOverlay(new BMapGL.Polygon(pts,{strokeColor:"#6e9b7e",strokeWeight:3,strokeOpacity:.7,fillColor:"transparent",fillOpacity:0}));m.addOverlay(new BMapGL.Polygon(pts,{strokeColor:"#b8d5c0",strokeWeight:1.5,strokeOpacity:.4,fillColor:"transparent",fillOpacity:0,strokeStyle:"dashed"}));});});
+},300);,function(rs){
     if(rs&&rs.boundaries)rs.boundaries.forEach(function(b){
       var pts=b.split(";").map(function(p){var pp=p.split(",");return new BMapGL.Point(parseFloat(pp[0]),parseFloat(pp[1]));});
       m.addOverlay(new BMapGL.Polygon(pts,{strokeColor:"#6e9b7e",strokeWeight:3,strokeOpacity:.7,fillColor:"transparent",fillOpacity:0}));
